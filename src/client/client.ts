@@ -17,7 +17,7 @@ var rodLengthShort = 330
 var rodLengthLong = 500
 var origin = new THREE.Vector3(0, centerSphereY, 0)
 var endBallRadius = 30
-var numberOfCircles = 5
+var numberOfCircles = 2
 
 const normalMaterial = new THREE.MeshNormalMaterial()
 const phongMaterial = new THREE.MeshPhongMaterial()
@@ -33,23 +33,23 @@ function makeManyCircles(numCircles: number): THREE.Mesh[] {
         const theta = Math.sqrt( l * Math.PI ) * phi;
 
         if(randFloat(0,1) > 0.5) {
-            var rodLength = rodLengthShort
-        } else {
             var rodLength = rodLengthLong
+        } else {
+            var rodLength = rodLengthShort
         }
-    
+        console.log("phi: " + phi + " theta: " + theta + " rodLength: " + rodLength)
         var extrudeSettings = { depth: rodLength, bevelEnabled: true, bevelSegments: 2, steps: 2, bevelSize: 1, bevelThickness: 1 };
 
         var myShape = makeCircle(10)
         var extrudedGeometry = new THREE.ExtrudeGeometry( myShape, extrudeSettings );
         const object = new THREE.Mesh( extrudedGeometry, normalMaterial );
 
-        object.position.setFromSphericalCoords( centerSphereRadius, phi, theta );
+        object.position.setFromSphericalCoords( centerSphereRadius, phi, theta )
 
         vector.copy( object.position ).multiplyScalar( 2 );
 
         object.lookAt( vector );
-        console.log("Circles: " + object.position)
+        console.log("Circles: " + object.position.x + " " + object.position.y + " " + object.position.z)
 
         circles.push( object );
     }
@@ -78,17 +78,16 @@ function makeMoonBody(moon: THREE.Mesh): CANNON.Body {
     return moonBody
 }
 
-function makeCircleBody(circle: THREE.Mesh, height: number): CANNON.Body {
-    const circleShape = new CANNON.Cylinder(10, 10, height)
-    const circleBody = new CANNON.Body({ mass: 0.5, shape: circleShape })
-    circleBody.shapeOffsets
-    circleBody.position.x = circle.position.x
-    circleBody.position.y = circle.position.y
-    circleBody.position.z = circle.position.z
-    circleBody.quaternion.set(circle.quaternion.x, circle.quaternion.y, circle.quaternion.z, circle.quaternion.w)
-    console.log(circleBody.quaternion)
-    console.log(circle.quaternion)
-    return circleBody
+function makeRodBody(circle: THREE.Mesh, height: number): CANNON.Body {
+    // It's actually a box ;)
+    const halfExtents = new CANNON.Vec3(10, height, 10)
+    const boxShape = new CANNON.Box(halfExtents)
+    const rodBody = new CANNON.Body({ mass: 0.5, shape: boxShape })
+    rodBody.position.x = circle.position.x
+    rodBody.position.y = circle.position.y
+    rodBody.position.z = circle.position.z
+    rodBody.quaternion.set(circle.quaternion.x, circle.quaternion.y, circle.quaternion.z, circle.quaternion.w)
+    return rodBody
 }
 
 
@@ -159,7 +158,7 @@ world.gravity.set(0, -1, 0)
 //world.solver.iterations = 10
 //world.allowSleep = true
 
-const centerSphereGeometry = new THREE.SphereGeometry(centerSphereRadius-3)
+const centerSphereGeometry = new THREE.SphereGeometry(centerSphereRadius-10)
 const centerSphereMesh = new THREE.Mesh(centerSphereGeometry, normalMaterial)
 centerSphereMesh.castShadow = true
 centerSphereMesh.position.add(origin)
@@ -167,10 +166,9 @@ centerSphereMesh.position.add(origin)
 centerSphereMesh.material.polygonOffset = true;
 centerSphereMesh.material.polygonOffsetUnits = 1;
 centerSphereMesh.material.polygonOffsetFactor = 1;
-centerSphereMesh.translateY(800)
 scene.add(centerSphereMesh)
 
-const centerSphereShape = new CANNON.Sphere(centerSphereRadius-3)
+const centerSphereShape = new CANNON.Sphere(centerSphereRadius-10)
 const centerSphereBody = new CANNON.Body({ mass: 1 })
 centerSphereBody.addShape(centerSphereShape)
 centerSphereBody.position.x = centerSphereMesh.position.x
@@ -184,7 +182,7 @@ world.addBody(centerSphereBody)
 
 interface CirclesMoonsBodies {
     circle: THREE.Mesh,
-    circleBody: CANNON.Body,
+    rodBody: CANNON.Body,
     moon: THREE.Mesh,
     moonBody: CANNON.Body
 }
@@ -211,23 +209,27 @@ myCircleList.forEach((circle, index) => {
     circle.name = "circle" + index
     //onsole.log(circle.quaternion)
     var moonBody = makeMoonBody(moon)
-    var circleBody = makeCircleBody(circle, rodLength)
-    console.log(circleBody)
-    circlesMoonsBodies.push({circle: circle.clone(), circleBody: circleBody, moon: moon.clone(), moonBody: moonBody})
+    var rodBody = makeRodBody(circle, rodLength)
+    console.log(rodBody)
+    circlesMoonsBodies.push({circle: circle.clone(), rodBody: rodBody, moon: moon.clone(), moonBody: moonBody})
 })
 
 circlesMoonsBodies.forEach((circlesMoonsBody, i) => {
     // attempt to move everyhing up some
-    circlesMoonsBodies[i].circle.translateY(800)
-    circlesMoonsBodies[i].moon.translateY(800)
-    circlesMoonsBodies[i].circleBody.position.y += 800
-    circlesMoonsBodies[i].moonBody.position.y += 800
+    //circlesMoonsBodies[i].circle.translateY(800)
+    //circlesMoonsBodies[i].moon.translateY(800)
+    //circlesMoonsBodies[i].rodBody.position.y += 800
+    //circlesMoonsBodies[i].moonBody.position.y += 800
+    circlesMoonsBodies[i].rodBody.updateBoundingRadius()
+    circlesMoonsBodies[i].circle.geometry.computeBoundingSphere()
+    console.log("three: " + circlesMoonsBodies[i].circle.position.x + " " + circlesMoonsBodies[i].circle.position.y + " " + circlesMoonsBodies[i].circle.position.z)
+    console.log("cannon: " + circlesMoonsBodies[i].rodBody.position.x + " " + circlesMoonsBodies[i].rodBody.position.y + " " + circlesMoonsBodies[i].rodBody.position.z)
     scene.add(circlesMoonsBodies[i].circle)
     scene.add(circlesMoonsBodies[i].moon)
-    //world.addBody(circlesMoonsBodies[i].circleBody)
+    world.addBody(circlesMoonsBodies[i].rodBody)
     world.addBody(circlesMoonsBodies[i].moonBody)
-    world.addConstraint(new CANNON.LockConstraint(circlesMoonsBodies[i].circleBody, circlesMoonsBodies[i].moonBody))
-    //world.addConstraint(new CANNON.LockConstraint(circlesMoonsBodies[i].circleBody, centerSphereBody))
+    //world.addConstraint(new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, circlesMoonsBodies[i].moonBody))
+    //world.addConstraint(new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, centerSphereBody))
 })
 
 
@@ -237,12 +239,14 @@ const planeGeometry = new THREE.PlaneGeometry(1000, 1000)
 const planeMesh = new THREE.Mesh(planeGeometry, phongMaterial)
 planeMesh.rotateX(-Math.PI / 2)
 planeMesh.receiveShadow = true
-scene.add(planeMesh)
+planeMesh.translateY(-1000)
+//scene.add(planeMesh)
 const planeShape = new CANNON.Plane()
 const planeBody = new CANNON.Body({ mass: 0 })
 planeBody.addShape(planeShape)
 planeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
-world.addBody(planeBody)
+planeBody.position.addScaledVector(1000, new CANNON.Vec3(0, -1, 0))
+//world.addBody(planeBody)
 
 window.addEventListener('resize', onWindowResize, false)
 function onWindowResize() {
@@ -282,8 +286,8 @@ function animate() {
     centerSphereMesh.quaternion.set(centerSphereBody.quaternion.x, centerSphereBody.quaternion.y, centerSphereBody.quaternion.z, centerSphereBody.quaternion.w)
 
     circlesMoonsBodies.forEach((circleMoon, index) => {
-        circlesMoonsBodies[index].circle.position.set(circleMoon.circleBody.position.x, circleMoon.circleBody.position.y, circleMoon.circleBody.position.z)
-        circlesMoonsBodies[index].circle.quaternion.set(circleMoon.circleBody.quaternion.x, circleMoon.circleBody.quaternion.y, circleMoon.circleBody.quaternion.z, circleMoon.circleBody.quaternion.w)
+        circlesMoonsBodies[index].circle.position.set(circleMoon.rodBody.position.x, circleMoon.rodBody.position.y, circleMoon.rodBody.position.z)
+        circlesMoonsBodies[index].circle.quaternion.set(circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
         circlesMoonsBodies[index].moon.position.set(circleMoon.moonBody.position.x, circleMoon.moonBody.position.y, circleMoon.moonBody.position.z)
         circlesMoonsBodies[index].moon.quaternion.set(circleMoon.moonBody.quaternion.x, circleMoon.moonBody.quaternion.y, circleMoon.moonBody.quaternion.z, circleMoon.moonBody.quaternion.w)
     })
