@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "build": "webpack --config ./src/client/webpack.prod.js && tsc -p ./src/serve",
+    "build": "webpack --config ./src/client/webpack.prod.js && tsc -p ./src/server",
     "dev": "webpack serve --config ./src/client/webpack.dev.js",
     "test": "echo \"Tests are for wimps, WE'LL DO IT LIVE!\" && exit 0",
     "start": "node ./dist/server/server.js",
