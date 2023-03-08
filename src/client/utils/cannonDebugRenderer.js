@@ -1,4 +1,3 @@
-"use strict";
 // MIT License
 // Original file https://github.com/schteppe/cannon.js/blob/908aa1e954b54d05a43dd708584e882dfe30ae29/tools/threejs/CannonDebugRenderer.js CopyRight https://github.com/schteppe
 // Differences Copyright 2020-2021 Sean Bradley : https://sbcode.net/threejs/
@@ -8,11 +7,10 @@
 // - Updated to support THREE.BufferGeometry (r125)
 // - added support for CANNON.Cylinder
 // - Updated to use cannon-es
-exports.__esModule = true;
-var THREE = require("three");
-var CANNON = require("cannon-es");
-var CannonDebugRenderer = /** @class */ (function () {
-    function CannonDebugRenderer(scene, world, options) {
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+export default class CannonDebugRenderer {
+    constructor(scene, world, options) {
         this._particleMaterial = new THREE.PointsMaterial();
         this.tmpVec0 = new CANNON.Vec3();
         this.tmpVec1 = new CANNON.Vec3();
@@ -24,13 +22,13 @@ var CannonDebugRenderer = /** @class */ (function () {
         this._meshes = [];
         this._material = new THREE.MeshBasicMaterial({
             color: 0x00ff00,
-            wireframe: true
+            wireframe: true,
         });
         this._particleMaterial = new THREE.PointsMaterial({
             color: 0xff0000,
             size: 10,
             sizeAttenuation: false,
-            depthTest: false
+            depthTest: false,
         });
         this._sphereGeometry = new THREE.SphereGeometry(1);
         this._boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -39,18 +37,18 @@ var CannonDebugRenderer = /** @class */ (function () {
         this._particleGeometry = new THREE.BufferGeometry();
         this._particleGeometry.setFromPoints([new THREE.Vector3(0, 0, 0)]);
     }
-    CannonDebugRenderer.prototype.update = function () {
-        var bodies = this.world.bodies;
-        var meshes = this._meshes;
-        var shapeWorldPosition = this.tmpVec0;
-        var shapeWorldQuaternion = this.tmpQuat0;
-        var meshIndex = 0;
-        for (var i = 0; i !== bodies.length; i++) {
-            var body = bodies[i];
-            for (var j = 0; j !== body.shapes.length; j++) {
-                var shape = body.shapes[j];
+    update() {
+        const bodies = this.world.bodies;
+        const meshes = this._meshes;
+        const shapeWorldPosition = this.tmpVec0;
+        const shapeWorldQuaternion = this.tmpQuat0;
+        let meshIndex = 0;
+        for (let i = 0; i !== bodies.length; i++) {
+            const body = bodies[i];
+            for (let j = 0; j !== body.shapes.length; j++) {
+                const shape = body.shapes[j];
                 this._updateMesh(meshIndex, body, shape);
-                var mesh = meshes[meshIndex];
+                const mesh = meshes[meshIndex];
                 if (mesh) {
                     // Get world position
                     body.quaternion.vmult(body.shapeOffsets[j], shapeWorldPosition);
@@ -69,16 +67,16 @@ var CannonDebugRenderer = /** @class */ (function () {
                 meshIndex++;
             }
         }
-        for (var i = meshIndex; i < meshes.length; i++) {
-            var mesh = meshes[i];
+        for (let i = meshIndex; i < meshes.length; i++) {
+            const mesh = meshes[i];
             if (mesh) {
                 this.scene.remove(mesh);
             }
         }
         meshes.length = meshIndex;
-    };
-    CannonDebugRenderer.prototype._updateMesh = function (index, body, shape) {
-        var mesh = this._meshes[index];
+    }
+    _updateMesh(index, body, shape) {
+        let mesh = this._meshes[index];
         if (!this._typeMatch(mesh, shape)) {
             if (mesh) {
                 console.log(shape.type);
@@ -87,12 +85,12 @@ var CannonDebugRenderer = /** @class */ (function () {
             mesh = this._meshes[index] = this._createMesh(shape);
         }
         this._scaleMesh(mesh, shape);
-    };
-    CannonDebugRenderer.prototype._typeMatch = function (mesh, shape) {
+    }
+    _typeMatch(mesh, shape) {
         if (!mesh) {
             return false;
         }
-        var geo = mesh.geometry;
+        const geo = mesh.geometry;
         return ((geo instanceof THREE.SphereGeometry &&
             shape instanceof CANNON.Sphere) ||
             (geo instanceof THREE.BoxGeometry && shape instanceof CANNON.Box) ||
@@ -103,15 +101,15 @@ var CannonDebugRenderer = /** @class */ (function () {
             shape instanceof CANNON.ConvexPolyhedron ||
             (geo.id === shape.id && shape instanceof CANNON.Trimesh) ||
             (geo.id === shape.id && shape instanceof CANNON.Heightfield));
-    };
-    CannonDebugRenderer.prototype._createMesh = function (shape) {
-        var mesh;
-        var geometry;
-        var v0;
-        var v1;
-        var v2;
-        var material = this._material;
-        var points = [];
+    }
+    _createMesh(shape) {
+        let mesh;
+        let geometry;
+        let v0;
+        let v1;
+        let v2;
+        const material = this._material;
+        let points = [];
         switch (shape.type) {
             case CANNON.Shape.types.SPHERE:
                 mesh = new THREE.Mesh(this._sphereGeometry, material);
@@ -134,18 +132,18 @@ var CannonDebugRenderer = /** @class */ (function () {
                 geometry = new THREE.BufferGeometry();
                 shape.id = geometry.id;
                 points = [];
-                for (var i = 0; i < shape.vertices.length; i += 1) {
-                    var v = shape.vertices[i];
+                for (let i = 0; i < shape.vertices.length; i += 1) {
+                    const v = shape.vertices[i];
                     points.push(new THREE.Vector3(v.x, v.y, v.z));
                 }
                 geometry.setFromPoints(points);
-                var indices = [];
-                for (var i = 0; i < shape.faces.length; i++) {
-                    var face = shape.faces[i];
-                    var a = face[0];
-                    for (var j = 1; j < face.length - 1; j++) {
-                        var b = face[j];
-                        var c = face[j + 1];
+                const indices = [];
+                for (let i = 0; i < shape.faces.length; i++) {
+                    const face = shape.faces[i];
+                    const a = face[0];
+                    for (let j = 1; j < face.length - 1; j++) {
+                        const b = face[j];
+                        const c = face[j + 1];
                         indices.push(a, b, c);
                     }
                 }
@@ -156,7 +154,7 @@ var CannonDebugRenderer = /** @class */ (function () {
                 geometry = new THREE.BufferGeometry();
                 shape.id = geometry.id;
                 points = [];
-                for (var i = 0; i < shape.vertices.length; i += 3) {
+                for (let i = 0; i < shape.vertices.length; i += 3) {
                     points.push(new THREE.Vector3(shape.vertices[i], shape.vertices[i + 1], shape.vertices[i + 2]));
                 }
                 geometry.setFromPoints(points);
@@ -167,9 +165,9 @@ var CannonDebugRenderer = /** @class */ (function () {
                 v0 = this.tmpVec0;
                 v1 = this.tmpVec1;
                 v2 = this.tmpVec2;
-                for (var xi = 0; xi < shape.data.length - 1; xi++) {
-                    for (var yi = 0; yi < shape.data[xi].length - 1; yi++) {
-                        for (var k = 0; k < 2; k++) {
+                for (let xi = 0; xi < shape.data.length - 1; xi++) {
+                    for (let yi = 0; yi < shape.data[xi].length - 1; yi++) {
+                        for (let k = 0; k < 2; k++) {
                             ;
                             shape.getConvexTrianglePillar(xi, yi, k === 0);
                             v0.copy(shape.pillarConvex
@@ -201,11 +199,11 @@ var CannonDebugRenderer = /** @class */ (function () {
             this.scene.add(mesh);
         }
         return mesh;
-    };
-    CannonDebugRenderer.prototype._scaleMesh = function (mesh, shape) {
-        var radius;
-        var halfExtents;
-        var scale;
+    }
+    _scaleMesh(mesh, shape) {
+        let radius;
+        let halfExtents;
+        let scale;
         switch (shape.type) {
             case CANNON.Shape.types.SPHERE:
                 radius = shape.radius;
@@ -227,7 +225,5 @@ var CannonDebugRenderer = /** @class */ (function () {
                 mesh.scale.set(1, 1, 1);
                 break;
         }
-    };
-    return CannonDebugRenderer;
-}());
-exports["default"] = CannonDebugRenderer;
+    }
+}
