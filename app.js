@@ -13,8 +13,6 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'dist/client')));
 
 // catch 404 and forward to error handler
-app.use('/', express.static(path.join(__dirname, 'dist/client'));
-app.use('*', express.static(path.join(__dirname, 'dist/client'));
 app.use(function(req, res, next) {
   next(createError(404));
 });
@@ -30,7 +28,7 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-app.use('/', express.static(path.join(__dirname, 'dist/client'));
-app.use('*', express.static(path.join(__dirname, 'dist/client'));
+app.use('/', express.static(path.join(__dirname, 'dist/client')));
+app.use('*', express.static(path.join(__dirname, 'dist/client')));
 
 module.exports = app;
