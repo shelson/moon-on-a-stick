@@ -14,7 +14,7 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'dist/client')));
+app.use(serveStatic('dist/client', { index: ['index.html', 'index.htm'] }))
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -31,8 +31,5 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-
-app.use('/', express.static(path.join(__dirname, 'dist/client')));
-app.use('*', express.static(path.join(__dirname, 'dist/client')));
 
 module.exports = app;
