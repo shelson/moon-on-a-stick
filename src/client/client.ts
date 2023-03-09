@@ -10,6 +10,7 @@ import { Vec3 } from 'cannon-es'
 import { CircleGeometry, SphereGeometry } from 'three'
 import { randFloat } from 'three/src/math/MathUtils'
 
+
 var centerSphereRadius = 65
 var centerSphereLargeRadius = 65
 var centerSphereY = 0
@@ -17,55 +18,41 @@ var rodLengthShort = 330
 var rodLengthLong = 500
 var origin = new THREE.Vector3(0, centerSphereY, 0)
 var endBallRadius = 30
-var numberOfCircles = 2
+var numberOfCircles = 10
 
 const normalMaterial = new THREE.MeshNormalMaterial()
 const phongMaterial = new THREE.MeshPhongMaterial()
 
-function makeManyCircles(numCircles: number): THREE.Mesh[] {
-    var vector = new THREE.Vector3()
-    var circles = []
+function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3): THREE.Mesh {
+    var HALF_PI = Math.PI * .5;
+    var distance = vstart.distanceTo(vend);
+    var position  = vend.clone().add(vstart).divideScalar(2);
 
-    
-    
-    for ( let i = 0, l = numCircles; i < l; i ++ ) {
-        const phi = Math.acos( - 1 + ( 2 * i ) / l );
-        const theta = Math.sqrt( l * Math.PI ) * phi;
+    var material = new THREE.MeshLambertMaterial({color:0x0000ff});
+    var cylinder = new THREE.CylinderGeometry(5,10,distance,10,10,false);
+    //cylinder.rotateX(Math.PI/2);
 
-        if(randFloat(0,1) > 0.5) {
-            var rodLength = rodLengthLong
-        } else {
-            var rodLength = rodLengthShort
-        }
-        console.log("phi: " + phi + " theta: " + theta + " rodLength: " + rodLength)
-        var extrudeSettings = { depth: rodLength, bevelEnabled: true, bevelSegments: 2, steps: 2, bevelSize: 1, bevelThickness: 1 };
+    var orientation = new THREE.Matrix4();//a new orientation matrix to offset pivot
+    var offsetRotation = new THREE.Matrix4();//a matrix to fix pivot rotation
+    var offsetPosition = new THREE.Matrix4();//a matrix to fix pivot position
+    orientation.lookAt(vstart,vend,new THREE.Vector3(0,1,0));//look at destination
+    offsetRotation.makeRotationX(HALF_PI);//rotate 90 degs on X
+    orientation.multiply(offsetRotation);//combine orientation with rotation transformations
+    cylinder.applyMatrix4(orientation)
 
-        var myShape = makeCircle(10)
-        var extrudedGeometry = new THREE.ExtrudeGeometry( myShape, extrudeSettings );
-        const object = new THREE.Mesh( extrudedGeometry, normalMaterial );
-
-        object.position.setFromSphericalCoords( centerSphereRadius, phi, theta )
-
-        vector.copy( object.position ).multiplyScalar( 2 );
-
-        object.lookAt( vector );
-        console.log("Circles: " + object.position.x + " " + object.position.y + " " + object.position.z)
-
-        circles.push( object );
-    }
-    return circles
+    var mesh = new THREE.Mesh(cylinder,material);
+    mesh.position.set(position.x,position.y,position.z)
+    return mesh
 }
 
-function calcPosFromLatLon(phi: number, theta: number, scale: number): THREE.Vector3 {
-    let lat = (90 - phi) * (Math.PI/180);
-    
-    let lon = (theta + 180) * (Math.PI/180);
-    
-    const x = -(Math.sin(lat)* Math.cos(lon))
-    const z = Math.sin(lat) * Math.sin(lon)
-    const y = Math.cos(lat)
-    console.log("x: " + x + " y: " + y + " z: " + z)
-    return new THREE.Vector3(x * scale , y * scale, z * scale)
+function makeRodBody(rod: THREE.Mesh): CANNON.Body {
+    const rodShape = new CANNON.Cylinder(5, 10, rod.position.length())
+    var rodBody = new CANNON.Body({ mass: 0.5 });
+    rodBody.addShape(rodShape);
+    rodBody.position.x = moon.position.x
+    rodBody.position.y = moon.position.y
+    rodBody.position.z = moon.position.z
+    return rodBody
 }
 
 function makeMoonBody(moon: THREE.Mesh): CANNON.Body {
@@ -76,30 +63,6 @@ function makeMoonBody(moon: THREE.Mesh): CANNON.Body {
     moonBody.position.z = moon.position.z
     moonBody.quaternion.set(moon.quaternion.x, moon.quaternion.y, moon.quaternion.z, moon.quaternion.w)
     return moonBody
-}
-
-function makeRodBody(circle: THREE.Mesh, height: number): CANNON.Body {
-    // It's actually a box ;)
-    const halfExtents = new CANNON.Vec3(10, height, 10)
-    const boxShape = new CANNON.Box(halfExtents)
-    const rodBody = new CANNON.Body({ mass: 0.5, shape: boxShape })
-    rodBody.position.x = circle.position.x
-    rodBody.position.y = circle.position.y
-    rodBody.position.z = circle.position.z
-    rodBody.quaternion.set(circle.quaternion.x, circle.quaternion.y, circle.quaternion.z, circle.quaternion.w)
-    return rodBody
-}
-
-
-function makeCircle(radius: number): THREE.Shape {
-    const circleRadius = radius;
-	const circleShape = new THREE.Shape()
-		.moveTo( 0, circleRadius )
-		.quadraticCurveTo( circleRadius, circleRadius, circleRadius, 0 )
-		.quadraticCurveTo( circleRadius, - circleRadius, 0, - circleRadius )
-		.quadraticCurveTo( - circleRadius, - circleRadius, - circleRadius, 0 )
-		.quadraticCurveTo( - circleRadius, circleRadius, 0, circleRadius )
-    return circleShape
 }
 
 function makeMoon(moonPosition: THREE.Vector3): THREE.Mesh {
@@ -181,7 +144,7 @@ centerSphereBody.quaternion.w = centerSphereMesh.quaternion.w
 world.addBody(centerSphereBody)
 
 interface CirclesMoonsBodies {
-    circle: THREE.Mesh,
+    rod: THREE.Mesh,
     rodBody: CANNON.Body,
     moon: THREE.Mesh,
     moonBody: CANNON.Body
@@ -189,42 +152,17 @@ interface CirclesMoonsBodies {
 
 var circlesMoonsBodies: CirclesMoonsBodies[] = []
 
-var myCircleList = makeManyCircles(numberOfCircles)
-myCircleList.forEach((circle, index) => {
-    // create a ball on the end of the circle
-    circle.geometry.computeBoundingSphere()
-    var boundingSphere = circle.geometry.boundingSphere
-    var circleSize = boundingSphere?.radius || 0
-    console.log("Circle Size: " + circleSize)
-    if(circleSize > 200) {
-        var rodLength = rodLengthLong
-    } else {
-        var rodLength = rodLengthShort
-    }
-    var neededPos = centerSphereRadius + rodLength + endBallRadius
-    var scaleFactor = neededPos / circle.position.length()
-    var endBallPos = new THREE.Vector3().addScaledVector(circle.position, scaleFactor)
-    var moon = makeMoon(endBallPos)
-    moon.name = "moon" + index
-    circle.name = "circle" + index
-    //onsole.log(circle.quaternion)
-    var moonBody = makeMoonBody(moon)
-    var rodBody = makeRodBody(circle, rodLength)
-    console.log(rodBody)
-    circlesMoonsBodies.push({circle: circle.clone(), rodBody: rodBody, moon: moon.clone(), moonBody: moonBody})
-})
+for(var i=1; i<=numberOfCircles; i++) {
+    var direction = new THREE.Vector3().randomDirection()
+    var moonPosition = new THREE.Vector3().addScaledVector(direction, 500)
+    var moon = makeMoon(moonPosition)
+    var rod = drawCylinder(centerSphereMesh.position, moonPosition)
+    circlesMoonsBodies.push({rod, rodBody: makeRodBody(rod), moon, moonBody: makeMoonBody(moon)})
+}
+
 
 circlesMoonsBodies.forEach((circlesMoonsBody, i) => {
-    // attempt to move everyhing up some
-    //circlesMoonsBodies[i].circle.translateY(800)
-    //circlesMoonsBodies[i].moon.translateY(800)
-    //circlesMoonsBodies[i].rodBody.position.y += 800
-    //circlesMoonsBodies[i].moonBody.position.y += 800
-    circlesMoonsBodies[i].rodBody.updateBoundingRadius()
-    circlesMoonsBodies[i].circle.geometry.computeBoundingSphere()
-    console.log("three: " + circlesMoonsBodies[i].circle.position.x + " " + circlesMoonsBodies[i].circle.position.y + " " + circlesMoonsBodies[i].circle.position.z)
-    console.log("cannon: " + circlesMoonsBodies[i].rodBody.position.x + " " + circlesMoonsBodies[i].rodBody.position.y + " " + circlesMoonsBodies[i].rodBody.position.z)
-    scene.add(circlesMoonsBodies[i].circle)
+    scene.add(circlesMoonsBodies[i].rod)
     scene.add(circlesMoonsBodies[i].moon)
     world.addBody(circlesMoonsBodies[i].rodBody)
     world.addBody(circlesMoonsBodies[i].moonBody)
@@ -282,12 +220,12 @@ function animate() {
     world.step(delta)
     cannonDebugRenderer.update()
 
-    centerSphereMesh.position.set(centerSphereBody.position.x, centerSphereBody.position.y, centerSphereBody.position.z)
-    centerSphereMesh.quaternion.set(centerSphereBody.quaternion.x, centerSphereBody.quaternion.y, centerSphereBody.quaternion.z, centerSphereBody.quaternion.w)
+    //centerSphereMesh.position.set(centerSphereBody.position.x, centerSphereBody.position.y, centerSphereBody.position.z)
+    //centerSphereMesh.quaternion.set(centerSphereBody.quaternion.x, centerSphereBody.quaternion.y, centerSphereBody.quaternion.z, centerSphereBody.quaternion.w)
 
     circlesMoonsBodies.forEach((circleMoon, index) => {
-        circlesMoonsBodies[index].circle.position.set(circleMoon.rodBody.position.x, circleMoon.rodBody.position.y, circleMoon.rodBody.position.z)
-        circlesMoonsBodies[index].circle.quaternion.set(circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
+        //circlesMoonsBodies[index].rod.position.set(circleMoon.rodBody.position.x, circleMoon.rodBody.position.y, circleMoon.rodBody.position.z)
+        //circlesMoonsBodies[index].rod.quaternion.set(circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
         circlesMoonsBodies[index].moon.position.set(circleMoon.moonBody.position.x, circleMoon.moonBody.position.y, circleMoon.moonBody.position.z)
         circlesMoonsBodies[index].moon.quaternion.set(circleMoon.moonBody.quaternion.x, circleMoon.moonBody.quaternion.y, circleMoon.moonBody.quaternion.z, circleMoon.moonBody.quaternion.w)
     })
