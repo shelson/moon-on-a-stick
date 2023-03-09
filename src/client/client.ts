@@ -18,10 +18,11 @@ var rodLengthShort = 330
 var rodLengthLong = 500
 var origin = new THREE.Vector3(0, centerSphereY, 0)
 var endBallRadius = 30
-var numberOfCircles = 10
+var numberOfCircles = 15
 
 const normalMaterial = new THREE.MeshNormalMaterial()
 const phongMaterial = new THREE.MeshPhongMaterial()
+
 
 function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3): THREE.Mesh {
     var HALF_PI = Math.PI * .5;
@@ -30,14 +31,16 @@ function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3): THREE.Mesh {
 
     var material = new THREE.MeshLambertMaterial({color:0x0000ff});
     var cylinder = new THREE.CylinderGeometry(5,10,distance,10,10,false);
-    //cylinder.rotateX(Math.PI/2);
+    cylinder.rotateX(Math.PI/2);
 
     var orientation = new THREE.Matrix4();//a new orientation matrix to offset pivot
     var offsetRotation = new THREE.Matrix4();//a matrix to fix pivot rotation
     var offsetPosition = new THREE.Matrix4();//a matrix to fix pivot position
     orientation.lookAt(vstart,vend,new THREE.Vector3(0,1,0));//look at destination
-    offsetRotation.makeRotationX(HALF_PI);//rotate 90 degs on X
+    offsetRotation.makeRotationZ(HALF_PI);//rotate 90 degs on X
     orientation.multiply(offsetRotation);//combine orientation with rotation transformations
+    var quaternionThing = new THREE.Quaternion().setFromRotationMatrix(orientation)
+
     cylinder.applyMatrix4(orientation)
 
     var mesh = new THREE.Mesh(cylinder,material);
@@ -46,12 +49,23 @@ function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3): THREE.Mesh {
 }
 
 function makeRodBody(rod: THREE.Mesh): CANNON.Body {
-    const rodShape = new CANNON.Cylinder(5, 10, rod.position.length())
-    var rodBody = new CANNON.Body({ mass: 0.5 });
+    // We can work out the quaternion using THREE
+    var orientation = new THREE.Matrix4();//a new orientation matrix to offset pivot
+    var offsetRotation = new THREE.Matrix4();//a matrix to fix pivot rotation
+    var offsetPosition = new THREE.Matrix4();//a matrix to fix pivot position
+    orientation.lookAt(rod.position,centerSphereMesh.position,new THREE.Vector3(0,1,0));//look at destination
+    //offsetRotation.makeRotationX(Math.PI / 2);//rotate 90 degs on X
+    orientation.multiply(offsetRotation);//combine orientation with rotation transformations
+    var quaternionThing = new THREE.Quaternion().setFromRotationMatrix(orientation)
+    const rodShape = new CANNON.Cylinder(5, 10, rod.position.length() * 2)
+    var rodBody = new CANNON.Body({ mass: 0 });
     rodBody.addShape(rodShape);
-    rodBody.position.x = moon.position.x
-    rodBody.position.y = moon.position.y
-    rodBody.position.z = moon.position.z
+    rodBody.shapeOrientations[0].setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2)
+    rodBody.shapeOffsets[0].set(0, 0, 0)
+    rodBody.position.x = rod.position.x
+    rodBody.position.y = rod.position.y
+    rodBody.position.z = rod.position.z
+    rodBody.quaternion.set(quaternionThing.x, quaternionThing.y, quaternionThing.z, quaternionThing.w)
     return rodBody
 }
 
@@ -223,12 +237,12 @@ function animate() {
     //centerSphereMesh.position.set(centerSphereBody.position.x, centerSphereBody.position.y, centerSphereBody.position.z)
     //centerSphereMesh.quaternion.set(centerSphereBody.quaternion.x, centerSphereBody.quaternion.y, centerSphereBody.quaternion.z, centerSphereBody.quaternion.w)
 
-    circlesMoonsBodies.forEach((circleMoon, index) => {
+    //circlesMoonsBodies.forEach((circleMoon, index) => {
         //circlesMoonsBodies[index].rod.position.set(circleMoon.rodBody.position.x, circleMoon.rodBody.position.y, circleMoon.rodBody.position.z)
         //circlesMoonsBodies[index].rod.quaternion.set(circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
-        circlesMoonsBodies[index].moon.position.set(circleMoon.moonBody.position.x, circleMoon.moonBody.position.y, circleMoon.moonBody.position.z)
-        circlesMoonsBodies[index].moon.quaternion.set(circleMoon.moonBody.quaternion.x, circleMoon.moonBody.quaternion.y, circleMoon.moonBody.quaternion.z, circleMoon.moonBody.quaternion.w)
-    })
+        //circlesMoonsBodies[index].moon.position.set(circleMoon.moonBody.position.x, circleMoon.moonBody.position.y, circleMoon.moonBody.position.z)
+        //circlesMoonsBodies[index].moon.quaternion.set(circleMoon.moonBody.quaternion.x, circleMoon.moonBody.quaternion.y, circleMoon.moonBody.quaternion.z, circleMoon.moonBody.quaternion.w)
+    //})
 
     render()
 
