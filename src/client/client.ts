@@ -18,11 +18,10 @@ var rodLengthShort = 330
 var rodLengthLong = 500
 var origin = new THREE.Vector3(0, centerSphereY, 0)
 var endBallRadius = 30
-var numberOfCircles = 10
+var numberOfCircles = 5
 
 const normalMaterial = new THREE.MeshNormalMaterial()
 const phongMaterial = new THREE.MeshPhongMaterial()
-
 
 function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3): THREE.Mesh {
     var HALF_PI = Math.PI * .5;
@@ -57,14 +56,14 @@ function makeRodBody(vstart: THREE.Vector3, vend: THREE.Vector3): CANNON.Body {
     var offsetRotation = new THREE.Matrix4();//a matrix to fix pivot rotation
     var offsetPosition = new THREE.Matrix4();//a matrix to fix pivot position
     orientation.lookAt(vstart, vend, new THREE.Vector3(0,1,0));//look at destination
-    //offsetRotation.makeRotationX(Math.PI / 2);//rotate 90 degs on X
+    offsetRotation.makeRotationX(Math.PI / 2);//rotate 90 degs on X
     orientation.multiply(offsetRotation);//combine orientation with rotation transformations
     var quaternionThing = new THREE.Quaternion().setFromRotationMatrix(orientation)
-    const rodShape = new CANNON.Cylinder(5, 10, distance - centerSphereRadius- endBallRadius + 10)
-    var rodBody = new CANNON.Body({ mass: 1 });
+    const rodShape = new CANNON.Cylinder(5, 10, distance - centerSphereRadius- endBallRadius + 13)
+    var rodBody = new CANNON.Body({ mass: 3 });
     rodBody.addShape(rodShape);
-    rodBody.shapeOrientations[0].setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2)
-    rodBody.shapeOffsets[0].set(0, 0, -10)
+    //rodBody.shapeOrientations[0].setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2)
+    //rodBody.shapeOffsets[0].set(0, 0, -10)
     rodBody.position.x = rod.position.x
     rodBody.position.y = rod.position.y
     rodBody.position.z = rod.position.z
@@ -147,8 +146,8 @@ centerSphereMesh.material.polygonOffsetUnits = 1;
 centerSphereMesh.material.polygonOffsetFactor = 1;
 scene.add(centerSphereMesh)
 
-const centerSphereShape = new CANNON.Sphere(centerSphereRadius-10)
-const centerSphereBody = new CANNON.Body({ mass: 5 })
+const centerSphereShape = new CANNON.Sphere(centerSphereRadius)
+const centerSphereBody = new CANNON.Body({ mass: 1 })
 centerSphereBody.addShape(centerSphereShape)
 centerSphereBody.position.x = centerSphereMesh.position.x
 centerSphereBody.position.y = centerSphereMesh.position.y
@@ -157,6 +156,8 @@ centerSphereBody.quaternion.x = centerSphereMesh.quaternion.x
 centerSphereBody.quaternion.y = centerSphereMesh.quaternion.y
 centerSphereBody.quaternion.z = centerSphereMesh.quaternion.z
 centerSphereBody.quaternion.w = centerSphereMesh.quaternion.w
+centerSphereBody.collisionResponse = false
+centerSphereBody.linearFactor.set(0, 0, 0)
 world.addBody(centerSphereBody)
 
 const HangerShape = new CANNON.Sphere(10)
@@ -181,7 +182,7 @@ var circlesMoonsBodies: CirclesMoonsBodies[] = []
 
 for(var i=1; i<=numberOfCircles; i++) {
     var distanceAmount = randFloat(0, 1)
-    var rodLength = 500
+    var rodLength = 330
     if(distanceAmount < 0.5) {
         rodLength = 330
     }
@@ -197,24 +198,46 @@ for(var i=1; i<=numberOfCircles; i++) {
 
 circlesMoonsBodies.forEach((circlesMoonsBody, i) => {
     scene.add(circlesMoonsBodies[i].rod)
+    circlesMoonsBodies[i].rodBody.collisionResponse = false
     world.addBody(circlesMoonsBodies[i].rodBody)
     //console.log("RodMesh: " + circlesMoonsBodies[i].rod.position.x + " " + circlesMoonsBodies[i].rod.position.y + " " + circlesMoonsBodies[i].rod.position.z)
     //console.log("RodBody: " + circlesMoonsBodies[i].rodBody.position.x + " " + circlesMoonsBodies[i].rodBody.position.y + " " + circlesMoonsBodies[i].rodBody.position.z)
     scene.add(circlesMoonsBodies[i].moon)
     //console.log("MoonMesh: " + circlesMoonsBodies[i].moon.position.x + " " + circlesMoonsBodies[i].moon.position.y + " " + circlesMoonsBodies[i].moon.position.z)
     
-    
-    world.addBody(circlesMoonsBodies[i].moonBody)
+    circlesMoonsBodies[i].moonBody.collisionResponse = false
+    //world.addBody(circlesMoonsBodies[i].moonBody)
     //console.log("MoonBody: " + circlesMoonsBodies[i].moonBody.position.x + " " + circlesMoonsBodies[i].moonBody.position.y + " " + circlesMoonsBodies[i].moonBody.position.z)
     //
     //world.addConstraint(
-    var foo = new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, circlesMoonsBodies[i].moonBody)
-    foo.collideConnected = false
-    world.addConstraint(foo)
-    var bar = new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, centerSphereBody)
+    //var foo = new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, circlesMoonsBodies[i].moonBody, { maxForce: 100000000 })
+    var vR2M = circlesMoonsBodies[i].moonBody.position.vsub(rodBody.position)
+    console.log("Vector from rod to moon: " + vR2M)
+    console.log("Distance from rod to moon: " + vR2M.length())
+    var vM2R = rodBody.position.vsub(circlesMoonsBodies[i].moonBody.position)
+    console.log("Vector from moon to rod: " + vM2R)
+    console.log("Distance from moon to rod: " + vM2R.length())
+    var vR2CscaleFactor = (vR2M.length() - centerSphereRadius) / vR2M.length()
+    console.log("Scale factor: " + vR2CscaleFactor)
+    var vC2RscaleFactor = (endBallRadius)/ vM2R.length()
+    console.log("Scale factor:  " + vC2RscaleFactor)
+    var newVC2R = vM2R.scale(vC2RscaleFactor)
+    console.log("New vector from moon to rod length: " + newVC2R.length())
+
+
+    //var bar = new CANNON.PointToPointConstraint(circlesMoonsBodies[i].rodBody, new CANNON.Vec3(0, 150, 0), centerSphereBody, new CANNON.Vec3(0,0,0), Number.MAX_VALUE)
+    var bar = new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, centerSphereBody, {
+        maxForce: Number.MAX_VALUE
+    })
     bar.collideConnected = false
     world.addConstraint(bar)
-    //world.addConstraint(new CANNON.LockConstraint(circlesMoonsBodies[i].rodBody, centerSphereBody))
+    console.log(bar)
+
+    var foo = new CANNON.PointToPointConstraint(circlesMoonsBodies[i].rodBody, new CANNON.Vec3(0, -150, 0), circlesMoonsBodies[i].moonBody, new CANNON.Vec3(0,0,0))
+    foo.collideConnected = false
+    //world.addConstraint(foo)
+    console.log(foo)
+
 })
 
 
@@ -274,7 +297,7 @@ function animate() {
     //console.log(circlesMoonsBodies[0].rodBody.position.x)
     circlesMoonsBodies.forEach((circleMoon, index) => {
         //circlesMoonsBodies[index].rod.position.set(circleMoon.rodBody.position.x, circleMoon.rodBody.position.y, circleMoon.rodBody.position.z)
-        //circlesMoonsBodies[index].rod.quaternion.set(circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
+        //circlesMoonsBodies[index].rod.quaternion.set(circleMoon.rodBody.quaternion.y, circleMoon.rodBody.quaternion.x, circleMoon.rodBody.quaternion.z, circleMoon.rodBody.quaternion.w)
         //circlesMoonsBodies[index].moon.position.set(circleMoon.moonBody.position.x, circleMoon.moonBody.position.y, circleMoon.moonBody.position.z)
         //circlesMoonsBodies[index].moon.quaternion.set(circleMoon.moonBody.quaternion.x, circleMoon.moonBody.quaternion.y, circleMoon.moonBody.quaternion.z, circleMoon.moonBody.quaternion.w)
     })
