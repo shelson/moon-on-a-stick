@@ -78,6 +78,7 @@ function centreOfMass(balls: THREE.Mesh[]): THREE.Vector3 {
 }
 
 function rebalance(centerSphere: THREE.Mesh): void {
+    reBuildSphere(centerSphere)
     var com = centreOfMass(centerSphere.children.map((child) => child as THREE.Mesh))
     console.log("Centre of mass: ")
     console.log(com)
@@ -103,6 +104,17 @@ function resetComRod(centerSphere: THREE.Mesh): void {
 
 }
 
+function checkDistances(suggestedSpot: THREE.Vector3): boolean {
+    moonsRods.moons.forEach((moon) => {
+        var distance = suggestedSpot.distanceTo(moon.position)
+        if(distance < 1000) {
+            console.log("Too close to another moon")
+            return false
+        }
+    })
+    return true
+}
+
 
 function addBall(centerSphere: THREE.Mesh): void {
     var distanceAmount = randFloat(0, 1)
@@ -110,8 +122,14 @@ function addBall(centerSphere: THREE.Mesh): void {
     if(distanceAmount < 0.5) {
         rodLength = 330
     }
-    var direction = new THREE.Vector3().randomDirection()
-    var moonPosition = new THREE.Vector3().addScaledVector(direction, rodLength)
+    var direction = new THREE.Vector3(randFloat(-1, 1), randFloat(-1, 1), randFloat(-1, 1))
+    var distanceOkay = false
+    var moonPosition = new THREE.Vector3
+    while(!distanceOkay) {
+        moonPosition = new THREE.Vector3().addScaledVector(direction, rodLength)
+        distanceOkay = checkDistances(moonPosition)
+    }
+
     var moon = makeMoon(moonPosition)
     var rod = drawCylinder(centerSphere.position, moonPosition, 0)
     moonsRods.rods.push(rod)
