@@ -182,7 +182,7 @@ var circlesMoonsBodies: CirclesMoonsBodies[] = []
 
 for(var i=1; i<=numberOfCircles; i++) {
     var distanceAmount = randFloat(0, 1)
-    var rodLength = 330
+    var rodLength = 500
     if(distanceAmount < 0.5) {
         rodLength = 330
     }
