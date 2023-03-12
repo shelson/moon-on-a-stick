@@ -4,12 +4,16 @@ import Stats from 'three/examples/jsm/libs/stats.module'
 import { GUI } from 'dat.gui'
 import * as CANNON from 'cannon-es'
 import CannonDebugRenderer from './utils/cannonDebugRenderer'
-import CannonUtils from './utils/cannonUtils'
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
-import { Vec3 } from 'cannon-es'
-import { CircleGeometry, SphereGeometry } from 'three'
 import { randFloat } from 'three/src/math/MathUtils'
+import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
+import { Blending } from 'three'
+import { MeshStandardMaterial, Mesh, SphereGeometry, BoxGeometry } from 'three';
+import { CSG } from 'three-csg-ts';
 
+const params = {
+    exportASCII: exportASCII,
+    exportBinary: exportBinary
+};
 
 var centerSphereRadius = 65
 var centerSphereLargeRadius = 65
@@ -22,6 +26,109 @@ var numberOfCircles = 2
 
 const normalMaterial = new THREE.MeshNormalMaterial()
 const phongMaterial = new THREE.MeshPhongMaterial()
+
+const exporter = new STLExporter();
+
+function exportASCII() {
+
+    const result = exporter.parse( makeCenterMesh() );
+    saveString( result, 'box.stl' );
+
+}
+
+function exportBinary() {
+
+    var result = new String()
+    //result = exporter.parse( centerSphereMesh, { binary: true } );
+    //saveArrayBuffer( result, 'box.stl' );
+
+}
+
+const link = document.createElement( 'a' );
+link.style.display = 'none';
+document.body.appendChild( link );
+
+function save( blob: Blob, filename: string ) {
+
+    link.href = URL.createObjectURL( blob );
+    link.download = filename;
+    link.click();
+
+}
+
+function saveString( text: string, filename: string ) {
+
+    save( new Blob( [ text ], { type: 'text/plain' } ), filename );
+
+}
+
+function saveArrayBuffer( buffer: Blob, filename: string ) {
+
+    save( new Blob( [ buffer ], { type: 'application/octet-stream' } ), filename );
+
+}
+
+function makeCenterMesh(): THREE.Mesh {
+    const csg = new THREE.SphereGeometry(centerSphereRadius)
+    var cmesh = new THREE.Mesh(csg, normalMaterial)
+    var circles = makeTangentCircles()
+    
+    var resMesh = subtractHole(cmesh, circles[0])
+    circles.forEach((circle) => {
+        resMesh = subtractHole(resMesh, circle)
+    })
+
+    return resMesh
+}
+
+function subtractHole(src: THREE.Mesh, hole: THREE.Mesh): THREE.Mesh {
+    // Make sure the .matrix of each mesh is current
+    src.updateMatrix();
+    hole.updateMatrix();
+
+    const subRes = CSG.subtract(src, hole);
+    
+    return subRes
+}
+
+function makeCircle(radius: number): THREE.Shape {
+    const circleRadius = radius;
+    const circleShape = new THREE.Shape()
+        .moveTo( 0, circleRadius )
+        .quadraticCurveTo( circleRadius, circleRadius, circleRadius, 0 )
+        .quadraticCurveTo( circleRadius, - circleRadius, 0, - circleRadius )
+        .quadraticCurveTo( - circleRadius, - circleRadius, - circleRadius, 0 )
+        .quadraticCurveTo( - circleRadius, circleRadius, 0, circleRadius )
+    return circleShape
+}
+
+function makeTangentCircles(): THREE.Mesh[] {
+    var vector = new THREE.Vector3()
+    var circles = []
+
+    for ( let i = 0, l = moonsRods.rods.length; i < l; i ++ ) {
+
+        var rodLength = 20
+    
+        var extrudeSettings = { depth: rodLength, bevelEnabled: true, bevelSegments: 2, steps: 2, bevelSize: 1, bevelThickness: 1 };
+
+        var myShape = makeCircle(8)
+        var extrudedGeometry = new THREE.ExtrudeGeometry( myShape, extrudeSettings );
+        const object = new THREE.Mesh( extrudedGeometry, normalMaterial );
+
+
+        object.position.copy( new THREE.Vector3().addScaledVector(moonsRods.rods[i].clone().position.normalize(), centerSphereRadius))
+        console.log(object.position)
+        vector.copy( object.position ).multiplyScalar( -2 );
+        object.up = new THREE.Vector3(0,1,0)
+        object.lookAt( vector );
+        console.log("Circles: " + object.position)
+
+        circles.push( object );
+    }
+    return circles
+}
+
 
 function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, type: number): THREE.Mesh {
     var HALF_PI = Math.PI * .5;
@@ -118,11 +225,11 @@ function checkDistances(suggestedSpot: THREE.Vector3): boolean {
 
 function addBall(centerSphere: THREE.Mesh): void {
     var distanceAmount = randFloat(0, 1)
-    var rodLength = 500
-    if(distanceAmount < 0.5) {
-        rodLength = 330
+    var rodLength = 500 + centerSphereRadius + endBallRadius
+    if(distanceAmount < 0.8) {
+        rodLength = 330 + centerSphereRadius + endBallRadius
     }
-    var direction = new THREE.Vector3(randFloat(-1, 1), randFloat(-1, 1), randFloat(-1, 1))
+    var direction = new THREE.Vector3(randFloat(-1, 1), randFloat(-1, 1), randFloat(-1, 1)).normalize()
     var distanceOkay = false
     var moonPosition = new THREE.Vector3
     while(!distanceOkay) {
@@ -243,6 +350,8 @@ const buttonFolder = gui.addFolder('Stuff')
 buttonFolder.add({ addBall: () => addBall(centerSphereMesh) }, 'addBall')
 buttonFolder.add({ rebalance: () => rebalance(centerSphereMesh) }, 'rebalance')
 buttonFolder.add({ reset: () => resetSphere(centerSphereMesh) }, 'reset')
+buttonFolder.add( params, 'exportBinary' ).name( 'Export STL (Binary)' );
+buttonFolder.add( params, 'exportASCII' ).name( 'Export STL (Ascii)' );
 buttonFolder.open()
 
 const clock = new THREE.Clock()
