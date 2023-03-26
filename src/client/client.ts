@@ -6,13 +6,7 @@ import * as CANNON from 'cannon-es'
 import CannonDebugRenderer from './utils/cannonDebugRenderer'
 import { randFloat } from 'three/src/math/MathUtils'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
-import { Blending } from 'three'
-import { MeshStandardMaterial, Mesh, SphereGeometry, BoxGeometry } from 'three';
 import { CSG } from 'three-csg-ts';
-
-const params = {
-    exportBinary: exportBinary
-};
 
 var centerSphereRadius = 50
 var centerSphereLargeRadius = 65
@@ -24,7 +18,6 @@ var endBallRadius = 62
 var numberOfCircles = 2
 
 const normalMaterial = new THREE.MeshNormalMaterial()
-const phongMaterial = new THREE.MeshPhongMaterial()
 
 const exporter = new STLExporter();
 
@@ -65,7 +58,6 @@ class MoonsRods {
 
 var moonsRods = new MoonsRods()
 
-
 function exportASCII(centerSphere: THREE.Mesh) {
 
     centerSphere.children.forEach((child) => {
@@ -85,12 +77,51 @@ function exportASCII(centerSphere: THREE.Mesh) {
 
 }
 
-function exportBinary() {
+interface ApiObject {
+    objData: string
+}
 
-    var result = new String()
+interface PostObject {
+    moons: Array<Array<number>>
+}
+
+function getCenterObj(jsonData: string): Promise<ApiObject> {
+	return fetch('https://ballsballsdockerrenderer.azurewebsites.net/api/makemeacenterballman', {
+		method: 'POST',
+        body: jsonData,
+		headers: {
+			'Content-Type': 'application/json'
+		},
+	})
+		.then((response) => response.json()) // Parse the response in JSON
+		.then((response) => {
+			return response as ApiObject; // Cast the response type to our interface
+		});
+}
+
+async function exportObj(centerSphere: THREE.Mesh) {
     //result = exporter.parse( centerSphereMesh, { binary: true } );
     //saveArrayBuffer( result, 'box.stl' );
+    var moonsData = new Array<Array<number>>();
+    var comData = new Array<number>();
 
+    centerSphere.children.forEach((child) => {
+        var position = child.clone().position
+        if (child.userData.type == 1) {
+            moonsData.push([position.x, position.y, position.z])
+            console.log("Moon: " + position.x + " " + position.y + " " + position.z)
+        }
+        if (child.userData.type == 2) {
+            comData = [position.x, position.y, position.z]
+            console.log("COM: " + position.x + " " + position.y + " " + position.z)
+        }
+    })
+
+    const jsonData = JSON.stringify({moons: moonsData, com: comData})
+    const resJson = await getCenterObj(jsonData)
+    const result = resJson.objData
+
+    saveString( result, 'centersphere.obj' );
 }
 
 const link = document.createElement( 'a' );
@@ -111,20 +142,14 @@ function saveString( text: string, filename: string ) {
 
 }
 
-function saveArrayBuffer( buffer: Blob, filename: string ) {
-
-    save( new Blob( [ buffer ], { type: 'application/octet-stream' } ), filename );
-
-}
-
 function makeCenterMesh(centerMesh: THREE.Mesh): THREE.Mesh {
-    const csg = new THREE.SphereGeometry(centerSphereRadius)
+    const csg = new THREE.SphereGeometry(centerSphereRadius, 128, 128)
     var cmesh = new THREE.Mesh(csg, normalMaterial)
-    var circles = makeTangentCircles(centerMesh)
+    var cylinders = makeHoleCylinders(centerMesh)
     
-    var resMesh = subtractHole(cmesh, circles[0])
-    circles.forEach((circle) => {
-        resMesh = subtractHole(resMesh, circle)
+    var resMesh = subtractHole(cmesh, cylinders[0])
+    cylinders.forEach((cylinder) => {
+        resMesh = subtractHole(resMesh, cylinder)
     })
 
     return resMesh
@@ -136,6 +161,8 @@ function subtractHole(src: THREE.Mesh, hole: THREE.Mesh): THREE.Mesh {
     hole.updateMatrix();
 
     const subRes = CSG.subtract(src, hole);
+
+    subRes.updateMatrix();
     
     return subRes
 }
@@ -151,6 +178,33 @@ function makeCircle(radius: number): THREE.Shape {
     return circleShape
 }
 
+function makeHoleCylinders(centerSphere: THREE.Mesh): THREE.Mesh[] {
+    var vector = new THREE.Vector3()
+    var cylinders: THREE.Mesh[] = []
+
+    for ( let i = 0, l = centerSphere.children.length; i < l; i ++ ) {
+        if (centerSphere.children[i].userData.type == 1) {
+            var rodLength = 20
+            var normalized = centerSphere.children[i].position.clone().normalize()
+            var inner_position = normalized.clone().multiplyScalar(centerSphereRadius - rodLength)
+            var outer_position = normalized.clone().multiplyScalar(centerSphereRadius + rodLength + 5) 
+
+            cylinders.push(drawCylinder(inner_position, outer_position, 10.25/2))
+        } else if (centerSphere.children[i].userData.type == 2) {
+            // Its the COM
+            var rodLength = 5
+            var normalized = centerSphere.children[i].position.clone().normalize()
+            var inner_position = normalized.clone().multiplyScalar(centerSphereRadius - rodLength)
+            var outer_position = normalized.clone().multiplyScalar(centerSphereRadius + rodLength + 5)
+
+            //make a nice flat bottom for the sphere
+            cylinders.push(drawCylinder(inner_position, outer_position, 30))
+        }
+    }
+
+    return cylinders
+}
+
 function makeTangentCircles(centerSphere: THREE.Mesh): THREE.Mesh[] {
     var vector = new THREE.Vector3()
     var circles: THREE.Mesh[] = []
@@ -159,11 +213,11 @@ function makeTangentCircles(centerSphere: THREE.Mesh): THREE.Mesh[] {
         if (centerSphere.children[i].userData.type == 0 || centerSphere.children[i].userData.type == 2) {
             var rodLength = 20
         
-            var radius = 8
+            var radius = 10.25/2
             var depth = rodLength
             if (centerSphere.children[i].userData.type == 2) {
-                radius = 0.5
-                depth = 1
+                radius = 30
+                depth = 5
             }
             var myShape = makeCircle(radius)
             var extrudeSettings = { depth: depth, bevelEnabled: false, bevelSegments: 2, steps: 2, bevelSize: 1, bevelThickness: 1 };
@@ -179,17 +233,18 @@ function makeTangentCircles(centerSphere: THREE.Mesh): THREE.Mesh[] {
     return circles
 }
 
-function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, type: number): THREE.Mesh {
+function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, radius: number): THREE.Mesh {
     var HALF_PI = Math.PI * .5;
     var distance = vstart.distanceTo(vend);
     var position  = vend.clone().add(vstart).divideScalar(2);
 
-    if (type == 0) {
+    // lazy way to guess when it's the com, to make it red
+    if (radius < 8 && radius > 0) {
         var material = new THREE.MeshLambertMaterial({color:0x0000ff});
     } else {
         var material = new THREE.MeshLambertMaterial({color:0xff0000});
     }
-    var cylinder = new THREE.CylinderGeometry(5,10,distance,10,10,false);
+    var cylinder = new THREE.CylinderGeometry(radius, radius,distance,30,30,false);
     cylinder.rotateX(Math.PI/2);
 
     var orientation = new THREE.Matrix4();//a new orientation matrix to offset pivot
@@ -202,8 +257,6 @@ function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, type: number):
     cylinder.applyMatrix4(orientation)
     var mesh = new THREE.Mesh(cylinder,material);
     mesh.position.set(position.x,position.y,position.z)
-    mesh.userData.type = type
-    mesh.userData.mass = 0.3
     return mesh
 }
 
@@ -248,7 +301,9 @@ function resetComRod(centerSphere: THREE.Mesh): void {
     })
     var com = centreOfMass(moonsRods.getRods().concat(moonsRods.getMoons()))
 
-    var comRod = drawCylinder(centerSphereMesh.position, com, 2)
+    var comRod = drawCylinder(centerSphereMesh.position, com, 6)
+    comRod.userData.mass = 0
+    comRod.userData.type = 2
     centerSphere.add(comRod)
 
 }
@@ -315,7 +370,9 @@ function addBall(centerSphere: THREE.Mesh, position: String): void {
     console.log("mass: " + mass)
     moon.userData.mass = mass
     moon.userData.type = type
-    var rod = drawCylinder(centerSphere.position, moonPosition, 0)
+    var rod = drawCylinder(centerSphere.position, moonPosition, 10.25/2)
+    rod.userData.mass = 0.3
+    rod.userData.type = 0
     moonsRods.addRod(rod)
     moonsRods.addMoon(moon)
     reBuildSphere(centerSphere)
@@ -415,7 +472,7 @@ buttonFolder.add({ addBallHigh: () => addBall(centerSphereMesh, new String("high
 buttonFolder.add({ addBallLow: () => addBall(centerSphereMesh, new String("low")) } , 'addBallLow')
 buttonFolder.add({ rebalance: () => rebalance(centerSphereMesh) }, 'rebalance')
 buttonFolder.add({ reset: () => resetSphere(centerSphereMesh) }, 'reset')
-buttonFolder.add( params, 'exportBinary' ).name( 'Export STL (Binary)' );
+buttonFolder.add( { exportObj: () => exportObj(centerSphereMesh)}, 'exportObj')
 buttonFolder.add({ exportAscii: () => exportASCII(centerSphereMesh)}, 'exportAscii')
 buttonFolder.open()
 
