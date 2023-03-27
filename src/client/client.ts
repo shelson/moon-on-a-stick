@@ -211,7 +211,7 @@ function rebalance(centerSphere: THREE.Mesh): void {
     var com = centreOfMass(centerSphere.children.map((child) => child as THREE.Mesh))
     var comQuaternion = new THREE.Quaternion();
     comQuaternion.setFromUnitVectors(com.normalize(), new THREE.Vector3(0, -1, 0))
-    centerSphere.applyQuaternion(comQuaternion)
+    centerSphere.setRotationFromQuaternion(comQuaternion)
 }
 
 function resetComRod(centerSphere: THREE.Mesh): void {
@@ -308,8 +308,12 @@ function resetSphere(centerSphere: THREE.Mesh): void {
 
 function reBuildSphere(centerSphere: THREE.Mesh): void {
     centerSphere.clear()
-    centerSphere.setRotationFromAxisAngle(new THREE.Vector3(0, 0, 0), 0)
+    // centerSphere.setRotationFromAxisAngle(new THREE.Vector3(0, 0, 0), 0)
     moonsRods.getMoons().forEach((moon) => {
+        console.log("moon position: " + moon.position.x + ", " + moon.position.y + ", " + moon.position.z)
+        var moonWorldPosition = new THREE.Vector3()
+        moon.getWorldPosition(moonWorldPosition)
+        console.log("moon world position: " + moonWorldPosition.x + ", " + moonWorldPosition.y + ", " + moonWorldPosition.z)
         centerSphere.add(moon)
     })
     moonsRods.getRods().forEach((rod) => {
