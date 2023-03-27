@@ -79,6 +79,7 @@ interface ApiObject {
 }
 
 async function getCenterObj(jsonData: string) {
+    console.log(jsonData)
 
     fetch("https://ballsballsdockerrenderer.azurewebsites.net/api/makemeacenterballman", {
       method: 'POST',
@@ -88,11 +89,11 @@ async function getCenterObj(jsonData: string) {
 
     .then((resp) => resp.json())
     .then((json) => {
-        console.log(json)
+        //console.log(json)
         if(json.status == "error") {
             console.log(json.message)
         } else {
-            saveString( json.objData, 'centersphere.obj' )
+            saveString( json.objdata, 'centersphere.obj' )
         }
     })
     .catch(error => {
@@ -118,9 +119,9 @@ function exportObj(centerSphere: THREE.Mesh) {
         }
     })
 
-    console.log(JSON.stringify({moons: moonsData, com: comData}))
+    console.log(JSON.stringify({moon_data: {moons: moonsData, com: comData}}))
 
-    const jsonData = JSON.stringify({moons: moonsData, com: comData})
+    const jsonData = JSON.stringify({moon_data: {moons: moonsData, com: comData}})
     getCenterObj(jsonData)
 }
 
