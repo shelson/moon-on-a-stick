@@ -89,7 +89,11 @@ async function getCenterObj(jsonData: string) {
     .then((resp) => resp.json())
     .then((json) => {
         console.log(json)
-        saveString( json.objData, 'centersphere.obj' )
+        if(json.status == "error") {
+            console.log(json.message)
+        } else {
+            saveString( json.objData, 'centersphere.obj' )
+        }
     })
     .catch(error => {
         console.log(error)
