@@ -72,34 +72,31 @@ function exportASCII(centerSphere: THREE.Mesh) {
 
     return
 
-    const result = exporter.parse( makeCenterMesh(centerSphere) );
-    saveString( result, 'centersphere.stl' );
-
 }
 
 interface ApiObject {
     objData: string
 }
 
-interface PostObject {
-    moons: Array<Array<number>>
+async function getCenterObj(jsonData: string) {
+
+    fetch("https://ballsballsdockerrenderer.azurewebsites.net/api/makemeacenterballman", {
+      method: 'POST',
+      body: jsonData,
+      headers: {'Content-Type': 'application/json'} 
+    })
+
+    .then((resp) => resp.json())
+    .then((json) => {
+        console.log(json)
+        saveString( json.objData, 'centersphere.obj' )
+    })
+    .catch(error => {
+        console.log(error)
+    })
 }
 
-function getCenterObj(jsonData: string): Promise<ApiObject> {
-	return fetch('https://ballsballsdockerrenderer.azurewebsites.net/api/makemeacenterballman', {
-		method: 'POST',
-        body: jsonData,
-		headers: {
-			'Content-Type': 'application/json'
-		},
-	})
-		.then((response) => response.json()) // Parse the response in JSON
-		.then((response) => {
-			return response as ApiObject; // Cast the response type to our interface
-		});
-}
-
-async function exportObj(centerSphere: THREE.Mesh) {
+function exportObj(centerSphere: THREE.Mesh) {
     //result = exporter.parse( centerSphereMesh, { binary: true } );
     //saveArrayBuffer( result, 'box.stl' );
     var moonsData = new Array<Array<number>>();
@@ -117,11 +114,10 @@ async function exportObj(centerSphere: THREE.Mesh) {
         }
     })
 
-    const jsonData = JSON.stringify({moons: moonsData, com: comData})
-    const resJson = await getCenterObj(jsonData)
-    const result = resJson.objData
+    console.log(JSON.stringify({moons: moonsData, com: comData}))
 
-    saveString( result, 'centersphere.obj' );
+    const jsonData = JSON.stringify({moons: moonsData, com: comData})
+    getCenterObj(jsonData)
 }
 
 const link = document.createElement( 'a' );
@@ -142,31 +138,6 @@ function saveString( text: string, filename: string ) {
 
 }
 
-function makeCenterMesh(centerMesh: THREE.Mesh): THREE.Mesh {
-    const csg = new THREE.SphereGeometry(centerSphereRadius, 128, 128)
-    var cmesh = new THREE.Mesh(csg, normalMaterial)
-    var cylinders = makeHoleCylinders(centerMesh)
-    
-    var resMesh = subtractHole(cmesh, cylinders[0])
-    cylinders.forEach((cylinder) => {
-        resMesh = subtractHole(resMesh, cylinder)
-    })
-
-    return resMesh
-}
-
-function subtractHole(src: THREE.Mesh, hole: THREE.Mesh): THREE.Mesh {
-    // Make sure the .matrix of each mesh is current
-    src.updateMatrix();
-    hole.updateMatrix();
-
-    const subRes = CSG.subtract(src, hole);
-
-    subRes.updateMatrix();
-    
-    return subRes
-}
-
 function makeCircle(radius: number): THREE.Shape {
     const circleRadius = radius;
     const circleShape = new THREE.Shape()
@@ -176,61 +147,6 @@ function makeCircle(radius: number): THREE.Shape {
         .quadraticCurveTo( - circleRadius, - circleRadius, - circleRadius, 0 )
         .quadraticCurveTo( - circleRadius, circleRadius, 0, circleRadius )
     return circleShape
-}
-
-function makeHoleCylinders(centerSphere: THREE.Mesh): THREE.Mesh[] {
-    var vector = new THREE.Vector3()
-    var cylinders: THREE.Mesh[] = []
-
-    for ( let i = 0, l = centerSphere.children.length; i < l; i ++ ) {
-        if (centerSphere.children[i].userData.type == 1) {
-            var rodLength = 20
-            var normalized = centerSphere.children[i].position.clone().normalize()
-            var inner_position = normalized.clone().multiplyScalar(centerSphereRadius - rodLength)
-            var outer_position = normalized.clone().multiplyScalar(centerSphereRadius + rodLength + 5) 
-
-            cylinders.push(drawCylinder(inner_position, outer_position, 10.25/2))
-        } else if (centerSphere.children[i].userData.type == 2) {
-            // Its the COM
-            var rodLength = 5
-            var normalized = centerSphere.children[i].position.clone().normalize()
-            var inner_position = normalized.clone().multiplyScalar(centerSphereRadius - rodLength)
-            var outer_position = normalized.clone().multiplyScalar(centerSphereRadius + rodLength + 5)
-
-            //make a nice flat bottom for the sphere
-            cylinders.push(drawCylinder(inner_position, outer_position, 30))
-        }
-    }
-
-    return cylinders
-}
-
-function makeTangentCircles(centerSphere: THREE.Mesh): THREE.Mesh[] {
-    var vector = new THREE.Vector3()
-    var circles: THREE.Mesh[] = []
-
-    for ( let i = 0, l = centerSphere.children.length; i < l; i ++ ) {
-        if (centerSphere.children[i].userData.type == 0 || centerSphere.children[i].userData.type == 2) {
-            var rodLength = 20
-        
-            var radius = 10.25/2
-            var depth = rodLength
-            if (centerSphere.children[i].userData.type == 2) {
-                radius = 30
-                depth = 5
-            }
-            var myShape = makeCircle(radius)
-            var extrudeSettings = { depth: depth, bevelEnabled: false, bevelSegments: 2, steps: 2, bevelSize: 1, bevelThickness: 1 };
-            var extrudedGeometry = new THREE.ExtrudeGeometry( myShape, extrudeSettings );
-            const object = new THREE.Mesh( extrudedGeometry, normalMaterial )
-            object.position.copy( new THREE.Vector3().addScaledVector(centerSphere.children[i].clone().position.normalize(), centerSphereRadius))
-            vector.copy( object.position ).multiplyScalar( -2 );
-            object.up = new THREE.Vector3(0,1,0)
-            object.lookAt( vector );
-            circles.push( object );
-        }
-    }
-    return circles
 }
 
 function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, radius: number): THREE.Mesh {
