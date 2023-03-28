@@ -101,16 +101,21 @@ async function getCenterObj(jsonData: string) {
     })
 }
 
+interface MoonData {
+    position: Array<number>
+    mass: number
+}
+
 function exportObj(centerSphere: THREE.Mesh) {
     //result = exporter.parse( centerSphereMesh, { binary: true } );
     //saveArrayBuffer( result, 'box.stl' );
-    var moonsData = new Array<Array<number>>();
+    var moonsData = new Array<MoonData>();
     var comData = new Array<number>();
 
     centerSphere.children.forEach((child) => {
         var position = child.clone().position
         if (child.userData.type == 1) {
-            moonsData.push([position.x, position.y, position.z])
+            moonsData.push({"position": [position.x, position.y, position.z], "mass": child.userData.mass})
             console.log("Moon: " + position.x + " " + position.y + " " + position.z)
         }
         if (child.userData.type == 2) {
@@ -141,17 +146,6 @@ function saveString( text: string, filename: string ) {
 
     save( new Blob( [ text ], { type: 'text/plain' } ), filename );
 
-}
-
-function makeCircle(radius: number): THREE.Shape {
-    const circleRadius = radius;
-    const circleShape = new THREE.Shape()
-        .moveTo( 0, circleRadius )
-        .quadraticCurveTo( circleRadius, circleRadius, circleRadius, 0 )
-        .quadraticCurveTo( circleRadius, - circleRadius, 0, - circleRadius )
-        .quadraticCurveTo( - circleRadius, - circleRadius, - circleRadius, 0 )
-        .quadraticCurveTo( - circleRadius, circleRadius, 0, circleRadius )
-    return circleShape
 }
 
 function drawCylinder(vstart: THREE.Vector3, vend: THREE.Vector3, radius: number): THREE.Mesh {
